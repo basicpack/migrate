@@ -25,12 +25,12 @@ class Migration
             return false;
         }
     }
-    public function migrateAll()
-    {
-        $dir=ROOT.'table/';
+    function getTables($dir){
+        $tables=null;
+
         //le os nomes das tabelas
         $listaDeTabelas=$this->myScanDir($dir);
-        $tables=null;
+
         //processa as tabelas
         foreach ($listaDeTabelas as $key => $nomeDaTabela) {
             //verifica se o nome da tabela é valido
@@ -47,6 +47,30 @@ class Migration
                 $tables[$nomeDaTabela]=$content;
             }
         }
+        return $tables;
+    }
+    public function migrateAll($repos)
+    {
+        $tables=[];
+        if($repos && is_array($repos)){
+            foreach ($repos as $repo) {
+                $dir=ROOT.$repo.'/table/';
+                $tabelas=$this->getTables($dir);
+                foreach ($tabelas as $nomeDaTabela => $nomeDasColunas) {
+                    if(isset($tables[$nomeDaTabela])){
+                        $tables[$nomeDaTabela]=array_merge($tables[$nomeDaTabela],$nomeDasColunas);
+                    }else{
+                        $tables[$nomeDaTabela]=$nomeDasColunas;
+                    }
+                }
+                // $tables[$nomeDaTabela]= array_unique($tables[$nomeDaTabela]);
+            }
+        }else{
+            $dir=ROOT.'table/';
+            $tables=$this->getTables($dir);
+        }
+        // var_export($tables);
+        // die('exit'.PHP_EOL);
         $tabelasNoBanco=$this->tabelasNoBanco();
         if ($tabelasNoBanco) {
             //exclusão de tabelas
@@ -130,110 +154,110 @@ class Migration
             $sql='ALTER TABLE `'.$tableName.'` ADD ';
             if ($columnName=='id') {
                 $sql=$sql.'`'.$columnName.'` serial;';
-            /*}elseif($columnName=='created_at'){
+                /*}elseif($columnName=='created_at'){
                 $sql=$sql.'`'.$columnName.'` TIMESTAMP DEFAULT CURRENT_TIMESTAMP;';
             }elseif($columnName=='updated_at'){
-                $sql=$sql.'`'.$columnName.'` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;';*/
-            } else {
-                $sql=$sql.'`'.$columnName.'` TEXT;';//65K chars
-            }
-            if (!$this->columnExists($tableName, $columnName)) {
-                return $this->query($sql);
-            }
+            $sql=$sql.'`'.$columnName.'` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;';*/
+        } else {
+            $sql=$sql.'`'.$columnName.'` TEXT;';//65K chars
         }
-    }
-    public function createTable(string $tableName)
-    {
-        $tableName=trim($tableName);
-        $sql='CREATE TABLE IF NOT EXISTS `'.$tableName.'`(id serial) ENGINE=INNODB;';
-        $return=$this->query($sql);
-        return $return;
-    }
-    public function deleteColumn(string $tableName, string $columnName)
-    {
-        if ($columnName!='id') {
-            $tableName=trim($tableName);
-            $columnName=trim($columnName);
-            $sql='ALTER TABLE '.$tableName.' DROP COLUMN '.$columnName;
+        if (!$this->columnExists($tableName, $columnName)) {
             return $this->query($sql);
         }
     }
-    public function deleteTable(string $tableName)
-    {
+}
+public function createTable(string $tableName)
+{
+    $tableName=trim($tableName);
+    $sql='CREATE TABLE IF NOT EXISTS `'.$tableName.'`(id serial) ENGINE=INNODB;';
+    $return=$this->query($sql);
+    return $return;
+}
+public function deleteColumn(string $tableName, string $columnName)
+{
+    if ($columnName!='id') {
         $tableName=trim($tableName);
-        $sql='DROP TABLE IF EXISTS '.$tableName;
+        $columnName=trim($columnName);
+        $sql='ALTER TABLE '.$tableName.' DROP COLUMN '.$columnName;
         return $this->query($sql);
     }
-    public function myScanDir(string $dir)
-    {
-        $ignored = array('.', '..', '.svn', '.htaccess');
-        $files = array();
-        foreach (scandir($dir) as $file) {
-            if (in_array($file, $ignored)) {
-                continue;
-            }
-            $files[$file] = filemtime($dir.$file);
+}
+public function deleteTable(string $tableName)
+{
+    $tableName=trim($tableName);
+    $sql='DROP TABLE IF EXISTS '.$tableName;
+    return $this->query($sql);
+}
+public function myScanDir(string $dir)
+{
+    $ignored = array('.', '..', '.svn', '.htaccess');
+    $files = array();
+    foreach (scandir($dir) as $file) {
+        if (in_array($file, $ignored)) {
+            continue;
         }
-        arsort($files);
-        $files = array_keys($files);
-        if($files){
-            return $files;
-        }else{
-            return false;
-        }
+        $files[$file] = filemtime($dir.$file);
     }
-    public function query(string $sql)
-    {
-        return $this->db->query($sql)->fetchAll();
+    arsort($files);
+    $files = array_keys($files);
+    if($files){
+        return $files;
+    }else{
+        return false;
     }
-    public function renameColumn(string $tableName, string $oldColumnName, string $create_columnName)
-    {
-        $tableName=trim($tableName);
-        $oldColumnName=trim($oldColumnName);
-        $create_columnName=trim($create_columnName);
-        if (!$this->tableExists($tableName)) {
-            return false;
-        }
-        if ($this->columnExists($tableName, $oldColumnName)) {
-            $sql='ALTER TABLE `'.$tableName.'` CHANGE ';
-            $sql=$sql.'`'.$oldColumnName.'` `'.$create_columnName.'` TEXT';
-            return $this->query($sql);
-        } else {
-            return false;
-        }
+}
+public function query(string $sql)
+{
+    return $this->db->query($sql)->fetchAll();
+}
+public function renameColumn(string $tableName, string $oldColumnName, string $create_columnName)
+{
+    $tableName=trim($tableName);
+    $oldColumnName=trim($oldColumnName);
+    $create_columnName=trim($create_columnName);
+    if (!$this->tableExists($tableName)) {
+        return false;
     }
-    public function tabelasNoBanco()
-    {
-        $sql='SHOW TABLES';
-        $result=$this->query($sql);
-        if (is_array($result)) {
-            $array=null;
-            foreach ($result as $key => $value) {
-                $array[]=array_values($value)[0];
-            }
-            return $array;
-        } else {
-            return false;
-        }
+    if ($this->columnExists($tableName, $oldColumnName)) {
+        $sql='ALTER TABLE `'.$tableName.'` CHANGE ';
+        $sql=$sql.'`'.$oldColumnName.'` `'.$create_columnName.'` TEXT';
+        return $this->query($sql);
+    } else {
+        return false;
     }
-    public function tableExists(string $tableName)
-    {
-        $tableName=trim($tableName);
-        $tables=$this->tabelasNoBanco();
-        if (@in_array($tableName, $tables)) {
-            return true;
-        } else {
-            return false;
+}
+public function tabelasNoBanco()
+{
+    $sql='SHOW TABLES';
+    $result=$this->query($sql);
+    if (is_array($result)) {
+        $array=null;
+        foreach ($result as $key => $value) {
+            $array[]=array_values($value)[0];
         }
+        return $array;
+    } else {
+        return false;
     }
-    public function validColumn(string $columnName)
-    {
-        $columnName=trim($columnName);
-        $allowed = array("_");
-        if (ctype_alpha(str_replace($allowed, '', $columnName))) {
-            return $columnName;
-        } else {
-            return false;
-        }
+}
+public function tableExists(string $tableName)
+{
+    $tableName=trim($tableName);
+    $tables=$this->tabelasNoBanco();
+    if (@in_array($tableName, $tables)) {
+        return true;
+    } else {
+        return false;
     }
+}
+public function validColumn(string $columnName)
+{
+    $columnName=trim($columnName);
+    $allowed = array("_");
+    if (ctype_alpha(str_replace($allowed, '', $columnName))) {
+        return $columnName;
+    } else {
+        return false;
+    }
+}
 }

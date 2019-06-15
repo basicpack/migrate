@@ -9,13 +9,13 @@ function dropAll($db){
     return $Migration->dropAll();
 }
 
-function migrate($db){
-    return migrateAll($db);
+function migrate($db,$repos=false){
+    return migrateAll($db,$repos);
 }
 
-function migrateAll($db){
+function migrateAll($db,$repos){
     $Migration=new Basic\Migration($db);
-    return $Migration->migrateAll();
+    return $Migration->migrateAll($repos);
 }
 
 function truncate($db){
